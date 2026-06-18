@@ -236,12 +236,31 @@ def start(message):
         markup = create_main_markup()
         bot.send_message(
             user_id,
-            f"👋 *Merhaba {first_name}!*\n\n"
-            f"🔥 *2026 YKS soru ve cevaplarına* ulaşmak için:\n\n"
-            f"1️⃣ Aşağıdaki kanallara katıl\n"
-            f"2️⃣ Botu arkadaşlarınla paylaş\n"
-            f"3️⃣ *{REFERRAL_GOAL} referans* kazan → Erişim aç\n"
-            f"🏆 İlk *{TOP_N}'e* gir → *Bedava erişim!*",
+            f"👋 *Merhaba {first_name}! YKS 2026 Botu'na hoş geldin!*\n\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n"
+            f"📚 *Bu bot ne işe yarıyor?*\n"
+            f"2026 YKS soru ve cevaplarına ücretsiz erişim sağlıyor. "
+            f"Erişim kazanmak için aşağıdaki adımları takip et.\n\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n"
+            f"📋 *Nasıl erişim kazanırsın?*\n\n"
+            f"*Yöntem 1 — Referans:*\n"
+            f"1️⃣ Önce aşağıdaki kanallara katıl\n"
+            f"2️⃣ ✅ 'Kanallara Katıldım' butonuna bas\n"
+            f"3️⃣ Sana özel referans linki gönderilecek\n"
+            f"4️⃣ Bu linki arkadaşlarınla paylaş\n"
+            f"5️⃣ *{REFERRAL_GOAL} kişi* doğrulayınca erişim açılır\n\n"
+            f"*Yöntem 2 — Liderlik Tablosu:*\n"
+            f"🏆 En çok referans getiren ilk *{TOP_N} kişi* "
+            f"hiç beklemeden *bedava erişim* kazanır!\n\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n"
+            f"🤖 *Komutlar:*\n\n"
+            f"▶️ /start — Bu menüyü göster\n"
+            f"🏆 /siralama — Liderlik tablosunu gör (kim kaçıncı)\n"
+            f"📊 /durumum — Kendi referans sayını ve sıranı gör\n"
+            f"🔗 /link — Referans linkini tekrar al\n"
+            f"❓ /yardim — Yardım ve sık sorulan sorular\n\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n"
+            f"⬇️ *Başlamak için önce kanallara katıl:*",
             reply_markup=markup,
             disable_web_page_preview=True,
             parse_mode="Markdown"
@@ -251,6 +270,93 @@ def start(message):
 @bot.message_handler(commands=['siralama'])
 def siralama(message):
     bot.send_message(message.from_user.id, format_leaderboard(), parse_mode="Markdown")
+
+# ====================== DURUMUM KOMUTU ======================
+@bot.message_handler(commands=['durumum'])
+def durumum(message):
+    user_id = message.from_user.id
+    referrals, _, verified = get_user_data(user_id)
+    top = get_top_users()
+    top_ids = [r[0] for r in top]
+
+    if user_id in top_ids:
+        pos = top_ids.index(user_id) + 1
+        siralama_text = f"🏆 Liderlik tablosunda *{pos}. sıradasın!*"
+    else:
+        siralama_text = f"📊 Henüz ilk {TOP_N}'de değilsin. Daha fazla paylaş!"
+
+    if verified == 1 and referrals >= REFERRAL_GOAL:
+        erisim = "✅ Erişimin açık"
+    elif verified == 1 and user_id in top_ids:
+        erisim = "✅ Liderlik tablosuyla erişimin açık"
+    elif verified == 1:
+        kalan = REFERRAL_GOAL - referrals
+        erisim = f"⏳ {kalan} referans daha lazım"
+    else:
+        erisim = "❌ Henüz kanal doğrulaması yapılmadı"
+
+    bot.send_message(
+        user_id,
+        f"📊 *Durumun:*\n\n"
+        f"👤 İsim: {message.from_user.first_name}\n"
+        f"🔗 Referans sayısı: *{referrals}*\n"
+        f"🎯 Hedef: *{REFERRAL_GOAL} referans*\n"
+        f"📌 Erişim: {erisim}\n"
+        f"{siralama_text}",
+        parse_mode="Markdown"
+    )
+
+# ====================== LİNK KOMUTU ======================
+@bot.message_handler(commands=['link'])
+def link(message):
+    user_id = message.from_user.id
+    _, _, verified = get_user_data(user_id)
+    if verified == 0:
+        bot.send_message(user_id,
+            "❌ Referans linki alabilmek için önce kanallara katılman ve doğrulaman gerekiyor.\n\n"
+            "/start yazarak başla.")
+        return
+    ref_link = get_referral_link(user_id)
+    markup = InlineKeyboardMarkup()
+    markup.add(InlineKeyboardButton("🤝 Arkadaşlarınla Paylaş", url=get_share_url(user_id)))
+    bot.send_message(
+        user_id,
+        f"🔗 *Senin referans linkin:*\n\n`{ref_link}`\n\n"
+        f"Bu linki arkadaşlarına gönder! Doğrulayan her kişi referans sayını artırır.",
+        reply_markup=markup,
+        parse_mode="Markdown"
+    )
+
+# ====================== YARDIM KOMUTU ======================
+@bot.message_handler(commands=['yardim'])
+def yardim(message):
+    bot.send_message(
+        message.from_user.id,
+        "❓ *Sık Sorulan Sorular*\n\n"
+        "━━━━━━━━━━━━━━━━━━━━\n"
+        "*Referans linkim nasıl çalışır?*\n"
+        "Linkini paylaştığın kişi bota gelip kanallara katılınca referansın 1 artar.\n\n"
+        "━━━━━━━━━━━━━━━━━━━━\n"
+        "*Kaç referans gerekiyor?*\n"
+        f"{REFERRAL_GOAL} kişi doğrularsa erişim açılır. Ya da liderlik tablosunda ilk {TOP_N}'e girersen bedava erişim kazanırsın!\n\n"
+        "━━━━━━━━━━━━━━━━━━━━\n"
+        "*Liderlik tablosu ne zaman güncellenir?*\n"
+        "Gerçek zamanlı güncellenir. /siralama yazarak anlık sıralamayı görebilirsin.\n\n"
+        "━━━━━━━━━━━━━━━━━━━━\n"
+        "*Referans linkimi kaybettim?*\n"
+        "/link yazarsan tekrar gönderilir.\n\n"
+        "━━━━━━━━━━━━━━━━━━━━\n"
+        "*Kaç referansım var?*\n"
+        "/durumum yazarsan tüm bilgilerin görünür.\n\n"
+        "━━━━━━━━━━━━━━━━━━━━\n"
+        "📌 *Komutlar:*\n"
+        "/start — Ana menü\n"
+        "/siralama — Liderlik tablosu\n"
+        "/durumum — Kendi durumun\n"
+        "/link — Referans linkin\n"
+        "/yardim — Bu sayfa",
+        parse_mode="Markdown"
+    )
 
 @bot.message_handler(func=lambda m: True)
 def handle_all(message):
